@@ -14,16 +14,16 @@ step:./plan.py
              creator   root:
               source   file:plan.py
              product   file:work/generate.py
-             product   step:./generate.py plan --step-info=../gen-info.json  # wd=work
+             product   step:./generate.py plan '{"out": ["../gen-info.json"]}'  # wd=work
              product   step:sd-make-inventory --include-info-inp gen-info.json --include-info-out gen-info.json --exclude '**/*.py' -o inventory.jsonl
 
 file:work/generate.py
                state = CONFIRMED
              creator   step:./plan.py
-                sink   step:./generate.py plan --step-info=../gen-info.json  # wd=work
-                sink   step:./generate.py run  # wd=work
+                sink   step:./generate.py plan '{"out": ["../gen-info.json"]}'  # wd=work
+                sink   step:./generate.py run '{"inp": ["src.txt"], "out": ["a.txt", "b.txt"]}'  # wd=work
 
-step:./generate.py plan --step-info=../gen-info.json  # wd=work
+step:./generate.py plan '{"out": ["../gen-info.json"]}'  # wd=work
                state = SUCCEEDED
                 need = PLAN
            using_env = STEPUP_PATH_FILTER [dynamic]
@@ -31,13 +31,13 @@ step:./generate.py plan --step-info=../gen-info.json  # wd=work
               source   file:work/generate.py
              product   file:gen-info.json
              product   file:work/src.txt
-             product   step:./generate.py run  # wd=work
+             product   step:./generate.py run '{"inp": ["src.txt"], "out": ["a.txt", "b.txt"]}'  # wd=work
                 sink   file:gen-info.json
 
 file:gen-info.json
                state = BUILT
-             creator   step:./generate.py plan --step-info=../gen-info.json  # wd=work
-              source   step:./generate.py plan --step-info=../gen-info.json  # wd=work
+             creator   step:./generate.py plan '{"out": ["../gen-info.json"]}'  # wd=work
+              source   step:./generate.py plan '{"out": ["../gen-info.json"]}'  # wd=work
                 sink   step:sd-make-inventory --include-info-inp gen-info.json --include-info-out gen-info.json --exclude '**/*.py' -o inventory.jsonl
 
 step:sd-make-inventory --include-info-inp gen-info.json --include-info-out gen-info.json --exclude '**/*.py' -o inventory.jsonl
@@ -58,15 +58,15 @@ file:inventory.jsonl
 
 file:work/src.txt
                state = CONFIRMED
-             creator   step:./generate.py plan --step-info=../gen-info.json  # wd=work
-                sink   step:./generate.py run  # wd=work
+             creator   step:./generate.py plan '{"out": ["../gen-info.json"]}'  # wd=work
+                sink   step:./generate.py run '{"inp": ["src.txt"], "out": ["a.txt", "b.txt"]}'  # wd=work
                 sink   step:sd-make-inventory --include-info-inp gen-info.json --include-info-out gen-info.json --exclude '**/*.py' -o inventory.jsonl
 
-step:./generate.py run  # wd=work
+step:./generate.py run '{"inp": ["src.txt"], "out": ["a.txt", "b.txt"]}'  # wd=work
                state = SUCCEEDED
                 need = DEFAULT
            using_env = STEPUP_PATH_FILTER [dynamic]
-             creator   step:./generate.py plan --step-info=../gen-info.json  # wd=work
+             creator   step:./generate.py plan '{"out": ["../gen-info.json"]}'  # wd=work
               source   file:work/generate.py
               source   file:work/src.txt
              product   file:work/a.txt
@@ -76,12 +76,12 @@ step:./generate.py run  # wd=work
 
 file:work/a.txt
                state = BUILT
-             creator   step:./generate.py run  # wd=work
-              source   step:./generate.py run  # wd=work
+             creator   step:./generate.py run '{"inp": ["src.txt"], "out": ["a.txt", "b.txt"]}'  # wd=work
+              source   step:./generate.py run '{"inp": ["src.txt"], "out": ["a.txt", "b.txt"]}'  # wd=work
                 sink   step:sd-make-inventory --include-info-inp gen-info.json --include-info-out gen-info.json --exclude '**/*.py' -o inventory.jsonl
 
 file:work/b.txt
                state = BUILT
-             creator   step:./generate.py run  # wd=work
-              source   step:./generate.py run  # wd=work
+             creator   step:./generate.py run '{"inp": ["src.txt"], "out": ["a.txt", "b.txt"]}'  # wd=work
+              source   step:./generate.py run '{"inp": ["src.txt"], "out": ["a.txt", "b.txt"]}'  # wd=work
                 sink   step:sd-make-inventory --include-info-inp gen-info.json --include-info-out gen-info.json --exclude '**/*.py' -o inventory.jsonl

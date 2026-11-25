@@ -49,7 +49,7 @@ def make_inventory(
         A pattern that matches no files is an error.
     include_info_inp, include_info_out
         Step info files, whose `inp` or `out` paths, respectively, are included,
-        e.g. written by `script(step_info=...)` or `dump_step_info()` in StepUp Core.
+        e.g. written by `dump_step_info()` in StepUp Core.
         The step info files are inputs of the step, and may be built by other steps.
         The included files come after `paths`, sorted together with those of `include`.
     exclude

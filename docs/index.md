@@ -29,6 +29,9 @@ StepUp Data is part of [Reproducible Reporting](https://github.com/reproducible-
     For production use, keep using
     [StepUp RepRep 4.2](https://reproducible-reporting.github.io/stepup-reprep/).
 
+    The section [From StepUp RepRep 4.2 to StepUp Data 4.3](reference/migration_from_reprep.md)
+    lists all changes to the API.
+
 ## Overview
 
 StepUp Data collects the files of a project into datasets that can be exchanged and archived.
@@ -52,13 +55,3 @@ Inventories are the common basis of all its features:
 
 [Archive a Git Repository](tutorials/archive_git.md)
 explains how to deposit the history and the sources of a project as static files.
-
-## Moving from StepUp RepRep 4.2
-
-This development release contains the inventory tools and the Zenodo synchronization
-of StepUp RepRep 4.2 under new names.
-The functions are imported from `stepup.data.api`,
-the commands start with `sd-` instead of `srr-`,
-and the Zenodo token is taken from `STEPUP_DATA_ZENODO_TOKEN`.
-Inventories, Zenodo configuration files and record-id files
-written for StepUp RepRep 4.2 are accepted unchanged.

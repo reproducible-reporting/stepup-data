@@ -66,104 +66,6 @@ because StepUp cannot track a directory as an input.
 `sd-make-inventory` refuses them when they are given by name,
 and leaves them out when an include pattern matches them.
 
-Files appear in the order in which they were given:
-first the paths given by name, in the given order,
-then the included files, sorted.
-When a path occurs twice, only its first occurrence is kept.
-
-The contents of an inventory only depend on the files it lists.
-It contains no time stamps, so StepUp does not rerun the steps that use it
-when the files did not change.
-
-## Selecting Files
-
-The files of an inventory are selected in a fixed order:
-
-1. The paths given by name, which are always literal paths, never patterns.
-   These are the argument `paths` of `make_inventory()`,
-   or the positional arguments of `sd-make-inventory`.
-2. The files selected with `include`.
-   An entry with wildcards is a
-   [Named Glob pattern](https://reproducible-reporting.github.io/stepup-core/reference/stepup.core.nglob/),
-   which may also contain `**` wildcards to match files recursively.
-   An entry without wildcards is a literal path.
-3. The inputs or outputs listed in step info files,
-   see [Files Listed in Step Info Files](#files-listed-in-step-info-files) below.
-4. Every file that matches an `exclude` pattern or path is removed,
-   whichever of the above selected it.
-
-The order of the arguments does not matter,
-so a file that was excluded cannot be included again.
-All paths and patterns are relative to the working directory of the step,
-or to the current directory on the command line.
-
-The include patterns follow the rules of
-[`glob()`](https://reproducible-reporting.github.io/stepup-core/reference/stepup.core.api/#stepup.core.api.glob)
-in StepUp Core:
-
-- A pattern only matches static files,
-  e.g. those inside a directory declared with `static("data/")`.
-  A file that a step builds must be listed by name,
-  in `paths` or as an include entry without wildcards.
-  A pattern that matches a built file fails the build.
-- When the set of files matched by a pattern changes, the inventory is rebuilt.
-- A pattern that matches no files is an error, to catch typos.
-  Directories matched by a pattern are left out.
-
-An exclude is matched against the normalized paths of the selected files, not against the disk,
-so it is not an error when it matches nothing.
-The inventory itself cannot be selected.
-
-On the command line, quote the patterns,
-so that the shell passes them to `sd-make-inventory` unchanged.
-For example, Bash without the `globstar` option expands an unquoted `data/**` like `data/*`,
-which then silently matches only one level of the directory tree.
-
-### Files Listed in Step Info Files
-
-An inventory can include the inputs or outputs listed in step info files,
-see [`StepInfo` Objects][core-step-info] in the documentation of StepUp Core.
-This is convenient for files built by other steps,
-because those cannot be matched by an include pattern.
-Any tool can write a step info file for StepUp Data to read,
-following the format described in [Step Info Files][core-step-info-files].
-
-The following `plan.py` makes an inventory of the inputs and outputs of the steps
-planned by `work/generate.py`:
-
-```python
-from stepup.core.api import script, static
-from stepup.data.api import make_inventory
-
-static("work/generate.py")
-script("generate.py", workdir="work/", step_info="../gen-info.json")
-make_inventory(
-    "inventory.jsonl",
-    include_info_inp="gen-info.json",
-    include_info_out="gen-info.json",
-    exclude="**/*.py",
-)
-```
-
-The argument `include_info_inp` adds the `inp` paths of the steps in the step info files,
-and `include_info_out` adds their `out` paths.
-On the command line, these are the options `--include-info-inp` and `--include-info-out`.
-Pass a file to both arguments to include the inputs as well as the outputs,
-or choose one, depending on the purpose of the inventory:
-
-- The outputs are the dataset produced by the steps, e.g. to archive their results.
-- The inputs are the data the steps consumed, e.g. to archive what is needed to reproduce them.
-
-Volatile files are never included, because they change at every run.
-In the example above, the script itself is an input of the steps it plans,
-which `exclude="**/*.py"` removes from the inventory.
-
-The step info files are inputs of the inventory step,
-so the inventory is made after the step that writes them.
-
-[core-step-info]: https://reproducible-reporting.github.io/stepup-core/tutorials/step_info/
-[core-step-info-files]: https://reproducible-reporting.github.io/stepup-core/tutorials/step_info/#step-info-files
-
 ## Creating `inventory.jsonl` Files
 
 ### Command-Line Tool `sd-make-inventory`
@@ -248,6 +150,130 @@ where Python derives them from the read-only attribute and the file name.
 `sd-make-inventory --mode` prints a warning on Windows,
 and the permission bits in an inventory are not checked on Windows.
 
+## Selecting Files
+
+The files of an inventory are selected in a fixed order:
+
+1. The paths given by name, which are always literal paths, never patterns.
+   These are the argument `paths` of `make_inventory()`,
+   or the positional arguments of `sd-make-inventory`.
+2. The files selected with `include`.
+   An entry with wildcards is a
+   [Named Glob pattern](https://reproducible-reporting.github.io/stepup-core/reference/stepup.core.nglob/),
+   which may also contain `**` wildcards to match files recursively.
+   An entry without wildcards is a literal path.
+3. The inputs or outputs listed in step info files,
+   see [Files Listed in Step Info Files](#files-listed-in-step-info-files) below.
+4. Every file that matches an `exclude` pattern or path is removed,
+   whichever of the above selected it.
+
+The order of the arguments does not matter,
+so a file that was excluded cannot be included again.
+All paths and patterns are relative to the working directory of the step,
+or to the current directory on the command line.
+
+The include patterns follow the rules of
+[`glob()`](https://reproducible-reporting.github.io/stepup-core/reference/stepup.core.api/#stepup.core.api.glob)
+in StepUp Core:
+
+- A pattern only matches static files,
+  e.g. those inside a directory declared with `static("data/")`.
+  A file that a step builds must be listed by name,
+  in `paths` or as an include entry without wildcards.
+  A pattern that matches a built file fails the build.
+- When the set of files matched by a pattern changes, the inventory is rebuilt.
+- A pattern that matches no files is an error, to catch typos.
+  Directories matched by a pattern are left out.
+
+An exclude is matched against the normalized paths of the selected files, not against the disk,
+so it is not an error when it matches nothing.
+The inventory itself cannot be selected.
+
+On the command line, quote the patterns,
+so that the shell passes them to `sd-make-inventory` unchanged.
+For example, Bash without the `globstar` option expands an unquoted `data/**` like `data/*`,
+which then silently matches only one level of the directory tree.
+
+### Files Listed in Step Info Files
+
+An inventory can include the inputs or outputs listed in step info files,
+see [`StepInfo` Objects][core-step-info] in the documentation of StepUp Core.
+This is convenient for files built by other steps,
+because those cannot be matched by an include pattern.
+Any tool can write a step info file for StepUp Data to read,
+following the format described in [Step Info Files][core-step-info-files].
+
+Step info files are needed when the steps are planned by another step,
+because `plan.py` cannot see the `StepInfo` objects of those steps.
+When the steps are defined in `plan.py` itself,
+their outputs can be passed to `paths` directly,
+e.g. `paths=info.rebase(".").out` for the `StepInfo` object `info` returned by `call()`.
+
+The following `plan.py` makes an inventory of the inputs and outputs of the steps
+planned by `work/generate.py`:
+
+```python
+from stepup.core.api import call, static
+from stepup.data.api import make_inventory
+
+static("work/generate.py")
+call("./generate.py", "plan", planning=True, workdir="work/", out="../gen-info.json")
+make_inventory(
+    "inventory.jsonl",
+    include_info_inp="gen-info.json",
+    include_info_out="gen-info.json",
+    exclude="**/*.py",
+)
+```
+
+The planning function in `work/generate.py` writes the step info file
+with [`dump_step_info()`][core-dump-step-info],
+which it receives as its output `out[0]`:
+
+```python
+from stepup.core.api import call, static
+from stepup.core.call import driver
+from stepup.core.stepinfo import dump_step_info
+
+
+def plan(out):
+    static("src.txt")
+    info = call("./generate.py", "run", inp="src.txt", out=["a.txt", "b.txt"])
+    dump_step_info(out[0], info)
+
+
+def run(inp, out):
+    with open(inp[0], encoding="utf-8") as fh:
+        text = fh.read()
+    for path_out in out:
+        with open(path_out, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(f"{path_out}: {text}")
+
+
+if __name__ == "__main__":
+    driver()
+```
+
+The argument `include_info_inp` adds the `inp` paths of the steps in the step info files,
+and `include_info_out` adds their `out` paths.
+On the command line, these are the options `--include-info-inp` and `--include-info-out`.
+Pass a file to both arguments to include the inputs as well as the outputs,
+or choose one, depending on the purpose of the inventory:
+
+- The outputs are the dataset produced by the steps, e.g. to archive their results.
+- The inputs are the data the steps consumed, e.g. to archive what is needed to reproduce them.
+
+Volatile files are never included, because they change at every run.
+In the example above, the script itself is an input of the steps it plans,
+which `exclude="**/*.py"` removes from the inventory.
+
+The step info files are inputs of the inventory step,
+so the inventory is made after the step that writes them.
+
+[core-step-info]: https://reproducible-reporting.github.io/stepup-core/advanced_topics/step_info/
+[core-step-info-files]: https://reproducible-reporting.github.io/stepup-core/advanced_topics/step_info/#step-info-files
+[core-dump-step-info]: https://reproducible-reporting.github.io/stepup-core/reference/stepup.core.stepinfo/#stepup.core.stepinfo.dump_step_info
+
 ## Creating a ZIP Archive from an `inventory.jsonl` File
 
 ### Command-Line Tool `sd-zip-inventory`
@@ -276,11 +302,10 @@ It differs from the conventional `zip` program in the following ways:
 - The listed files are inputs of the step, besides the inventory,
   so the ZIP file is rebuilt whenever one of them changes,
   even when the inventory itself stays the same.
-- The inventory itself is not added to the ZIP file.
+- The ZIP file is reproducible: all time stamps in the ZIP file are set to January 1st, 1980.
 - The paths in the ZIP file are those in the inventory.
   A file outside the directory of the inventory, with a path starting with `../`,
-  cannot be archived, so such an inventory is refused.
-- The ZIP file is reproducible: all time stamps in the ZIP file are set to January 1st, 1980.
+  cannot be archived and results in an error.
 - Symbolic links are added as links, instead of the contents they point to.
 
 For archival, keep the inventory as a separate file next to the ZIP file,

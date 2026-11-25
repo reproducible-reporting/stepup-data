@@ -31,6 +31,7 @@ nav = [
     "reference/stepup.data.api.md",
     "reference/sync_zenodo_config.md",
     "reference/zenodo_vocabularies.md",
+    "reference/migration_from_reprep.md",
   ] },
   { "Development" = [
     "development.md",
