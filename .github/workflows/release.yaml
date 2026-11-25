@@ -71,9 +71,8 @@ jobs:
   publish-to-pypi:
     name: Publish Python distribution to PyPI
     timeout-minutes: 3
-    # Only publish to PyPI on tag pushes,
-    # and not while the repository is private, because its first upload is made by hand.
-    if: startsWith(github.ref, 'refs/tags/v') && !github.event.repository.private
+    # Only publish to PyPI on tag pushes.
+    if: startsWith(github.ref, 'refs/tags/v')
     needs:
     - build
     runs-on: ubuntu-latest
@@ -148,8 +147,7 @@ jobs:
     timeout-minutes: 3
     if: >-
       ${{ github.ref == 'refs/heads/main'
-      && github.repository_owner == 'reproducible-reporting'
-      && !github.event.repository.private }}
+      && github.repository_owner == 'reproducible-reporting' }}
     needs:
     - build
     runs-on: ubuntu-latest
