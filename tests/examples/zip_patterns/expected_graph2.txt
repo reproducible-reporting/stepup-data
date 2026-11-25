@@ -1,0 +1,84 @@
+root:
+             product   file:plan.py
+             product   step:./plan.py
+
+file:plan.py
+               state = CONFIRMED
+             creator   root:
+                sink   step:./plan.py
+
+step:./plan.py
+               state = SUCCEEDED
+                need = PLAN
+           using_env = STEPUP_PATH_FILTER [dynamic]
+             creator   root:
+              source   file:plan.py
+             product   st:data/
+             product   step:sd-make-inventory --include 'data/**' --exclude 'data/**/*.inp' -o inventory.jsonl
+             product   step:sd-zip-inventory inventory.jsonl upload.zip
+
+st:data/
+             creator   step:./plan.py
+             product   file:data/fine.out
+             product   file:data/sub/deeper/nested.out
+             product   file:data/sub/extra.out
+             product   file:data/sub/works.out
+
+step:sd-make-inventory --include 'data/**' --exclude 'data/**/*.inp' -o inventory.jsonl
+               state = SUCCEEDED
+                need = DEFAULT
+               nglob = data/**
+             creator   step:./plan.py
+              source   file:data/fine.out [dynamic]
+              source   file:data/sub/deeper/nested.out [dynamic]
+              source   file:data/sub/extra.out [dynamic]
+              source   file:data/sub/works.out [dynamic]
+             product   file:inventory.jsonl
+                sink   file:inventory.jsonl
+
+file:inventory.jsonl
+               state = BUILT
+             creator   step:sd-make-inventory --include 'data/**' --exclude 'data/**/*.inp' -o inventory.jsonl
+              source   step:sd-make-inventory --include 'data/**' --exclude 'data/**/*.inp' -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+step:sd-zip-inventory inventory.jsonl upload.zip
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+              source   file:data/fine.out [dynamic]
+              source   file:data/sub/deeper/nested.out [dynamic]
+              source   file:data/sub/extra.out [dynamic]
+              source   file:data/sub/works.out [dynamic]
+              source   file:inventory.jsonl
+             product   file:upload.zip
+                sink   file:upload.zip
+
+file:upload.zip
+               state = BUILT
+             creator   step:sd-zip-inventory inventory.jsonl upload.zip
+              source   step:sd-zip-inventory inventory.jsonl upload.zip
+
+file:data/fine.out
+               state = CONFIRMED
+             creator   st:data/
+                sink   step:sd-make-inventory --include 'data/**' --exclude 'data/**/*.inp' -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+file:data/sub/deeper/nested.out
+               state = CONFIRMED
+             creator   st:data/
+                sink   step:sd-make-inventory --include 'data/**' --exclude 'data/**/*.inp' -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+file:data/sub/works.out
+               state = CONFIRMED
+             creator   st:data/
+                sink   step:sd-make-inventory --include 'data/**' --exclude 'data/**/*.inp' -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+file:data/sub/extra.out
+               state = CONFIRMED
+             creator   st:data/
+                sink   step:sd-make-inventory --include 'data/**' --exclude 'data/**/*.inp' -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip

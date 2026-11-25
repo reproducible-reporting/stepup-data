@@ -1,0 +1,69 @@
+root:
+             product   file:plan.py
+             product   step:./plan.py
+
+file:plan.py
+               state = CONFIRMED
+             creator   root:
+                sink   step:./plan.py
+
+step:./plan.py
+               state = SUCCEEDED
+                need = PLAN
+           using_env = STEPUP_PATH_FILTER [dynamic]
+             creator   root:
+              source   file:plan.py
+             product   file:static.txt
+             product   step:echo hello > built.txt
+             product   step:sd-make-inventory static.txt built.txt -o inventory.jsonl
+             product   step:sd-zip-inventory inventory.jsonl upload.zip
+
+file:static.txt
+               state = CONFIRMED
+             creator   step:./plan.py
+                sink   step:sd-make-inventory static.txt built.txt -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+step:echo hello > built.txt
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+             product   file:built.txt
+                sink   file:built.txt
+
+file:built.txt
+               state = BUILT
+             creator   step:echo hello > built.txt
+              source   step:echo hello > built.txt
+                sink   step:sd-make-inventory static.txt built.txt -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+step:sd-make-inventory static.txt built.txt -o inventory.jsonl
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+              source   file:built.txt
+              source   file:static.txt
+             product   file:inventory.jsonl
+                sink   file:inventory.jsonl
+
+file:inventory.jsonl
+               state = BUILT
+             creator   step:sd-make-inventory static.txt built.txt -o inventory.jsonl
+              source   step:sd-make-inventory static.txt built.txt -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+step:sd-zip-inventory inventory.jsonl upload.zip
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+              source   file:built.txt [dynamic]
+              source   file:inventory.jsonl
+              source   file:static.txt [dynamic]
+             product   file:upload.zip
+                sink   file:upload.zip
+
+file:upload.zip
+               state = BUILT
+             creator   step:sd-zip-inventory inventory.jsonl upload.zip
+              source   step:sd-zip-inventory inventory.jsonl upload.zip

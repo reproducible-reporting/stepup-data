@@ -1,0 +1,71 @@
+root:
+             product   file:plan.py
+             product   step:./plan.py
+
+file:plan.py
+               state = CONFIRMED
+             creator   root:
+                sink   step:./plan.py
+
+step:./plan.py
+               state = SUCCEEDED
+                need = PLAN
+           using_env = STEPUP_PATH_FILTER [dynamic]
+               nglob = data/**/*.out
+             creator   root:
+              source   file:plan.py
+             product   file:data/fine.out
+             product   file:data/sub/deeper/nested.out
+             product   file:data/sub/works.out
+             product   step:sd-make-inventory data/fine.out data/sub/deeper/nested.out data/sub/works.out -o inventory.jsonl
+             product   step:sd-zip-inventory inventory.jsonl upload.zip
+
+file:data/fine.out
+               state = CONFIRMED
+             creator   step:./plan.py
+                sink   step:sd-make-inventory data/fine.out data/sub/deeper/nested.out data/sub/works.out -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+file:data/sub/deeper/nested.out
+               state = CONFIRMED
+             creator   step:./plan.py
+                sink   step:sd-make-inventory data/fine.out data/sub/deeper/nested.out data/sub/works.out -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+file:data/sub/works.out
+               state = CONFIRMED
+             creator   step:./plan.py
+                sink   step:sd-make-inventory data/fine.out data/sub/deeper/nested.out data/sub/works.out -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+step:sd-make-inventory data/fine.out data/sub/deeper/nested.out data/sub/works.out -o inventory.jsonl
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+              source   file:data/fine.out
+              source   file:data/sub/deeper/nested.out
+              source   file:data/sub/works.out
+             product   file:inventory.jsonl
+                sink   file:inventory.jsonl
+
+file:inventory.jsonl
+               state = BUILT
+             creator   step:sd-make-inventory data/fine.out data/sub/deeper/nested.out data/sub/works.out -o inventory.jsonl
+              source   step:sd-make-inventory data/fine.out data/sub/deeper/nested.out data/sub/works.out -o inventory.jsonl
+                sink   step:sd-zip-inventory inventory.jsonl upload.zip
+
+step:sd-zip-inventory inventory.jsonl upload.zip
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+              source   file:data/fine.out [dynamic]
+              source   file:data/sub/deeper/nested.out [dynamic]
+              source   file:data/sub/works.out [dynamic]
+              source   file:inventory.jsonl
+             product   file:upload.zip
+                sink   file:upload.zip
+
+file:upload.zip
+               state = BUILT
+             creator   step:sd-zip-inventory inventory.jsonl upload.zip
+              source   step:sd-zip-inventory inventory.jsonl upload.zip

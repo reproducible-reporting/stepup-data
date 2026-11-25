@@ -1,0 +1,7 @@
+.stepup
+current_*
+inventory.jsonl
+gen-info.json
+work/src.txt
+work/a.txt
+work/b.txt

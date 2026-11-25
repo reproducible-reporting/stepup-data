@@ -1,0 +1,41 @@
+root:
+             product   file:plan.py
+             product   step:./plan.py
+
+file:plan.py
+               state = CONFIRMED
+             creator   root:
+                sink   step:./plan.py
+
+step:./plan.py
+               state = SUCCEEDED
+                need = PLAN
+           using_env = STEPUP_PATH_FILTER [dynamic]
+             creator   root:
+              source   file:plan.py
+             product   step:echo a > out/a.txt
+             product   step:sd-make-inventory --include 'out/*.txt' -o inventory.jsonl
+
+step:echo a > out/a.txt
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+             product   file:out/a.txt
+                sink   file:out/a.txt
+
+file:out/a.txt
+               state = BUILT
+             creator   step:echo a > out/a.txt
+              source   step:echo a > out/a.txt
+
+step:sd-make-inventory --include 'out/*.txt' -o inventory.jsonl
+               state = FAILED
+                need = DEFAULT
+             creator   step:./plan.py
+             product   file:inventory.jsonl
+                sink   file:inventory.jsonl
+
+file:inventory.jsonl
+               state = PLANNED
+             creator   step:sd-make-inventory --include 'out/*.txt' -o inventory.jsonl
+              source   step:sd-make-inventory --include 'out/*.txt' -o inventory.jsonl

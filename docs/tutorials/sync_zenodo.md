@@ -1,0 +1,358 @@
+---
+description: >-
+  Create a Zenodo draft dataset with sync_zenodo()
+  and keep its metadata and files in sync with your StepUp project.
+---
+
+<!--
+SPDX-FileCopyrightText: 2024 Toon Verstraelen <Toon.Verstraelen@UGent.be>
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
+# Synchronize a Zenodo Dataset With Your Local Files
+
+StepUp Data can create a draft dataset in Zenodo on your behalf,
+and automatically update it when the local versions of your files have changed.
+You can also provide metadata within your StepUp project,
+which minimizes the amount of GUI interaction required in the Zenodo web interface.
+This approach also makes it easier for all your collaborators
+to review and contribute to the (meta)data before the dataset is published on Zenodo.
+
+You will still need to use the Zenodo web interface to publish the dataset,
+and to add it to a community for review.
+If your files change, and you want to create a new version,
+you must change the version in the configuration file into one that was not published before.
+
+## Configure Your Zenodo Token
+
+The `sd-sync-zenodo` command takes your personal access token
+from the `STEPUP_DATA_ZENODO_TOKEN` environment variable.
+This is the token itself, not the path to a file containing it.
+
+To create the token, go to the settings of your
+[Zenodo account](https://zenodo.org/account/settings/applications/tokens/new/).
+Enable the `deposit:actions` and `deposit:write` scopes when creating a new token.
+Save the token immediately, as it cannot be retrieved later.
+
+For a trial run, e.g. to try out `sd-sync-zenodo`, you can use the Zenodo Sandbox instead.
+It has accounts and tokens of its own,
+so create the token in the settings of your
+[Zenodo Sandbox account](https://sandbox.zenodo.org/account/settings/applications/tokens/new/),
+and set the `endpoint` field of the configuration file to `https://sandbox.zenodo.org/api`.
+The [configuration reference](../reference/sync_zenodo_config.md) explains
+under `endpoint` why the sandbox is not suitable for a dataset that you intend to publish.
+
+As observed in November 2026, Zenodo answers a token of the other instance
+with the same "Permission denied." as a token without the right scopes.
+When Zenodo denies access, `sd-sync-zenodo` therefore reminds you of both causes.
+
+Because the token is a secret, it is not tracked by StepUp,
+so it never ends up in the workflow graph.
+Instead, the synchronization step looks at the token at every start of StepUp,
+so it notices when you set or unset the token between two runs of `stepup build`.
+Keep the token out of your repository, for example by exporting it from a file that Git ignores.
+
+When `STEPUP_DATA_ZENODO_TOKEN` is unset or empty,
+`sd-sync-zenodo` validates the configuration file, prints a warning
+and exits without contacting Zenodo.
+Use the `--dry-run` option to only validate the configuration, without this warning.
+
+The endpoint is not an environment variable but a required field of the configuration file,
+so that StepUp notices when you switch between the sandbox and the production instance,
+and so that the configuration file shows on which instance its record lives.
+
+## Configure a Zenodo Dataset
+
+The metadata of the dataset is written in a configuration file,
+for which `sync_zenodo.yaml` is the recommended name.
+Every field of this file is documented in
+[The `sd-sync-zenodo` Configuration File](../reference/sync_zenodo_config.md),
+which also holds a template to start from.
+
+The description of the dataset is written in a separate Markdown or HTML file,
+for which `zenodo_description.md` is the recommended name.
+Markdown is converted to HTML before it is sent to Zenodo.
+A description is required, but a single sentence will do.
+
+## Synchronize Your Dataset
+
+The command `sd-sync-zenodo` will create or synchronize the online dataset
+and store the record ID in the file named by the `path_record_id` field.
+This way, future calls will update this record instead of creating a new dataset on Zenodo.
+
+The files to upload are listed in an [inventory](inventory_files.md),
+which also holds the MD5 checksum of each file.
+`sd-sync-zenodo` compares these checksums with the ones that Zenodo reports,
+and uploads only the files that differ.
+In a StepUp workflow, the inventory is written and kept up to date by a separate step.
+
+### In a StepUp Workflow
+
+Include the inventory and the synchronization in your `plan.py` file:
+
+```python
+from stepup.core.api import static
+from stepup.data.api import make_inventory, sync_zenodo
+
+static("sync_zenodo.yaml", "zenodo_description.md", "file1", "sub/file2")
+make_inventory("zenodo_inventory.jsonl", paths=["file1", "sub/file2"])
+sync_zenodo("sync_zenodo.yaml", "zenodo_description.md", "zenodo_inventory.jsonl")
+```
+
+This defines two steps:
+
+1. `sd-make-inventory file1 sub/file2 -o zenodo_inventory.jsonl`
+   writes the inventory.
+   StepUp runs it again only when one of the files has changed.
+2. `sd-sync-zenodo sync_zenodo.yaml zenodo_description.md
+   zenodo_inventory.jsonl --no-check-md5`
+   synchronizes the dataset.
+   It runs at every start of StepUp and after a recheck, as explained in
+   [When the Synchronization Runs](#when-the-synchronization-runs).
+
+The first file of the inventory is always selected as the default preview file.
+Pass that file as the first entry of `paths` in `make_inventory()`,
+because the files selected by patterns or step info files come after `paths`, sorted,
+see [Selecting Files](inventory_files.md#selecting-files).
+The order of the other files has no effect on Zenodo.
+As of November 2026, the Zenodo API does not store an order of the files,
+and the landing page of a record lists them alphabetically.
+Choose the file names accordingly when their order matters.
+
+The paths in the inventory are relative to its parent directory,
+so the inventory can be put in any directory.
+The `--no-check-md5` option tells `sd-sync-zenodo` to trust the checksums in the inventory,
+because StepUp keeps the inventory up to date.
+A start of StepUp without local changes therefore computes no checksums.
+When the inventory is not built in the same workflow, e.g. for an external dataset,
+pass `check_md5=True` to `sync_zenodo()`,
+so that the checksums are computed again before anything is uploaded.
+
+### Requirements for the Inventory
+
+`sd-sync-zenodo` accepts only an inventory that can be uploaded as it is:
+
+- The digests must be MD5 checksums, because Zenodo reports these.
+  This is the default of `make_inventory()` and `sd-make-inventory`.
+- The inventory must not contain symbolic links, because Zenodo has no links.
+- The inventory must list at least one file,
+  because Zenodo publishes no record without files
+  and does not offer metadata only records.
+- The files must meet the limitations of Zenodo, see below.
+
+An inventory that does not meet these requirements is refused before Zenodo is contacted.
+
+### By Hand
+
+Outside a workflow, a synchronization takes two commands:
+the first one writes the inventory, and the second one synchronizes the dataset.
+
+```bash
+sd-make-inventory file1 sub/file2 -o zenodo_inventory.jsonl
+sd-sync-zenodo sync_zenodo.yaml zenodo_description.md zenodo_inventory.jsonl
+```
+
+Without `--no-check-md5`, `sd-sync-zenodo` computes the checksums of the files again,
+and stops before it contacts Zenodo when one of them differs from the inventory.
+Run `sd-make-inventory` again after every change of the files,
+or run `stepup build` in a project that uses `sync_zenodo()`.
+
+Add the `--dry-run` option to check the configuration without contacting Zenodo.
+It validates the configuration file, the description and the inventory,
+prints the metadata that would be sent to Zenodo and exits.
+This works with or without a token,
+so it is the way to review the metadata before the first upload.
+It needs the inventory as well, so it also takes two commands:
+
+```bash
+sd-make-inventory file1 sub/file2 -o zenodo_inventory.jsonl
+sd-sync-zenodo sync_zenodo.yaml zenodo_description.md zenodo_inventory.jsonl --dry-run
+```
+
+### Limitations of Zenodo
+
+Zenodo does not support subdirectories,
+so files are uploaded without reference to their parent directory.
+This also means that two files with the same name in different subdirectories
+cannot both be included.
+Zenodo also limits the number of files in a record to 100.
+If you run into either limitation,
+consider uploading a ZIP archive made with [`zip_inventory()`][stepup.data.api.zip_inventory]
+instead of separate files.
+Upload the inventory of the ZIP archive as well,
+because `sd-check-inventory` needs it to check the unpacked files.
+`sd-sync-zenodo` rejects both cases before Zenodo is contacted.
+
+### Files to Commit
+
+The record ID file belongs in Git.
+Commit it as soon as `sd-sync-zenodo` has written it,
+because a clone without it creates a second record at its first start with the token.
+An inventory written by `make_inventory()` does not belong in Git,
+because it is an output of the build.
+
+## When the Synchronization Runs
+
+The synchronization step runs once at every start of StepUp,
+because `sync_zenodo()` defines it with `recheck=True`,
+as explained in StepUp Core's [Running a Step at Every Start][core-recheck].
+Within the same run of `stepup build`, e.g. in watch mode,
+it runs again after every change of its inputs:
+the inventory, the files it lists, the configuration file and the description.
+In watch mode, press `R` or run `stepup rebuild --recheck` in another terminal
+to run it again without a restart,
+e.g. after a file was changed or deleted in the draft through the web interface.
+
+[core-recheck]: https://reproducible-reporting.github.io/stepup-core/tutorials/external_data/#running-a-step-at-every-start
+
+With a token, it compares the files with the checksums that Zenodo reports,
+uploads the ones that differ or are missing online,
+and sends the metadata again,
+because Zenodo normalizes some values, so a comparison is not worth the effort.
+For example, as observed on 2026-11-21, Zenodo strips the trailing newline of the description
+and prefixes arXiv identifiers with `arXiv:`.
+A file that was deleted or changed in the draft through the web interface
+is therefore uploaded again at the next start or recheck, also when nothing changed locally.
+Without a token, the step prints a warning every time it runs and sends nothing.
+
+A recheck has two consequences that are easily overlooked:
+
+- **A recheck does not see a new token.**
+  The steps get the environment that StepUp had when it started,
+  so a token exported after `stepup build` started is ignored until StepUp restarts.
+  Likewise, a token that was unset after the start is still used.
+- **With the token set, `R` synchronizes.**
+  When Caps Lock is on, a press of `r`, which only rebuilds, becomes `R`.
+  For a published record, a synchronization puts the record in edit mode and publishes it again,
+  as described in [Published Records](#published-records).
+
+### Working Assumptions
+
+This behavior rests on two practices:
+
+- **A synchronization is a deliberate act.**
+  Set the token only for a build that should synchronize,
+  e.g. a `stepup build` with `STEPUP_DATA_ZENODO_TOKEN` set after a round of edits.
+  While a draft is in progress, do this regularly,
+  so that your co-authors can review a recent build and the metadata.
+- **One person in a team uploads.**
+  Only this person sets the token, and the others review the draft without one.
+  Two clones that synchronize the same record overwrite each other's files at every synchronization
+  when their builds are not identical,
+  and a new version made from one clone leaves the record ID file of the other one stale.
+
+### Offline Builds and Failures
+
+With a token, a build fails when Zenodo cannot be reached.
+Such a build passes with `stepup build --offline` or without the token.
+With `--offline`, the synchronization step does not run merely because StepUp started,
+and pressing `R` or running `stepup rebuild --recheck` has the same effect as `r`.
+When it runs because one of its inputs changed,
+it says that the build is offline and sends nothing.
+The next start without `--offline` synchronizes again.
+Offline builds are explained in the documentation of StepUp Core, in
+[Working Offline][core-offline].
+
+[core-offline]: https://reproducible-reporting.github.io/stepup-core/tutorials/external_data/#working-offline
+
+### Published Records
+
+When the record ID file names a published record with the version in the configuration file,
+every synchronization with the token puts the record in edit mode,
+sends the metadata and publishes the record again,
+with the same metadata unless the configuration file or the description changed.
+Unset the token when a published record needs no further updates.
+
+## Inspect and Reset a Dataset
+
+Add the `--verbose` option to print every request that `sd-sync-zenodo` sends to Zenodo
+and every response it receives.
+The token is never printed, so the output can be shared when reporting a problem.
+
+To start over with a draft that was never published,
+discard it in the web interface of Zenodo and remove the file named by `path_record_id`.
+The next run then creates a new dataset.
+To drop a new version that is not published yet,
+discard it in the web interface and put the id of the latest published version
+back in the file named by `path_record_id`.
+
+## Legacy Deposit Versus the InvenioRDM API
+
+Zenodo can be told about a record in more than one way,
+and the three ways below are easily confused,
+because they use different names for overlapping metadata.
+
+- **The legacy deposit metadata, `.zenodo.json`.**
+  This is a file in a Git repository,
+  which Zenodo reads when it archives a GitHub release through its
+  [GitHub integration](https://developers.zenodo.org/#github).
+  Its schema is the legacy deposit schema,
+  [`legacyrecord.json`](https://github.com/zenodo/zenodo/blob/master/zenodo/modules/deposit/jsonschemas/deposits/records/legacyrecord.json).
+  The loader silently drops keys it does not recognize
+  and rejects values outside its controlled vocabularies.
+  Zenodo publishes this schema, but it lags the loader that Zenodo runs,
+  which is worth knowing before you rely on it.
+
+- **The legacy REST API, `/api/deposit/depositions`**,
+  as documented on <https://developers.zenodo.org/>.
+
+- **The InvenioRDM API, `/api/records`**,
+  which `sd-sync-zenodo` currently uses.
+  Zenodo does not document it itself,
+  but InvenioRDM, the software that Zenodo runs, does,
+  in its [REST API reference](https://inveniordm.docs.cern.ch/reference/rest_api_index/)
+  and its [metadata reference](https://inveniordm.docs.cern.ch/reference/metadata/).
+  It offers fields that the legacy API cannot express,
+  which are listed in the next section.
+
+A key that works in `.zenodo.json` is not necessarily a key that works here,
+and vice versa, so do not blindly copy metadata between the two.
+A project may well have both:
+a `.zenodo.json` for the archive of its source code,
+and a `sync_zenodo.yaml` for the dataset built from it.
+
+### Fields Only the InvenioRDM API Offers
+
+The following features of `sd-sync-zenodo` have no legacy equivalent,
+as observed on 2026-08-31 in the loader that Zenodo runs,
+`zenodo_rdm.legacy.deserializers`:
+
+- `metadata.license` and `metadata.languages` are lists,
+  while the legacy loader reads a single `license` and a single `language`.
+- `metadata.copyright` has no legacy counterpart.
+- `metadata.creators[].affiliations` is a list,
+  and an affiliation may be given by its ROR identifier,
+  while the legacy `affiliation` is a single free text name.
+- `metadata.creators[].identifiers` accepts `isni`,
+  while the legacy loader accepts only `orcid` and `gnd`.
+- `metadata.related[].scheme` states the scheme of an identifier,
+  while the legacy loader detects the scheme from the value and cannot be corrected.
+- `metadata.funding[]` describes a funder by name or ROR identifier,
+  and an award by title, number and identifiers,
+  while the legacy `grants` can only refer to an award that Zenodo already knows,
+  written as `<funder DOI>::<award id>`.
+- `sd-sync-zenodo` also selects the file shown in the preview,
+  which the legacy API does not store.
+
+## Related Work
+
+[zenodraft](https://github.com/zenodraft/zenodraft) is a Node command line tool
+that also creates and updates Zenodo drafts from metadata in a repository.
+It talks to the legacy deposit API and is not tied to a build system,
+whereas `sd-sync-zenodo` is a StepUp step,
+so the files it uploads can be the tracked outputs of a build,
+and it talks to the InvenioRDM API.
+
+## Recommended Workflow
+
+Set up `sync_zenodo()` early,
+ideally when you start a publication,
+instead of preparing the dataset only after the manuscript is finished.
+Review the metadata with `--dry-run` and create the draft.
+After every round of edits, run a build with the token to refresh the draft,
+and repeat this regularly while the draft is in progress.
+
+Share the draft with your co-authors as soon as it exists.
+They then have access to a recent build of the publication PDFs,
+and they can review and correct the metadata while the work is still in progress,
+which avoids a rush of last-minute corrections just before publication.

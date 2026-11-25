@@ -1,0 +1,23 @@
+ STARTUP │ (Re)initialized boot script
+   PHASE │ build
+   START │ ./plan.py
+ SUCCESS │ ./plan.py
+   START │ echo a > out/a.txt
+ SUCCESS │ echo a > out/a.txt
+   START │ sd-make-inventory --include 'out/*.txt' -o inventory.jsonl
+    FAIL │ sd-make-inventory --include 'out/*.txt' -o inventory.jsonl
+──────────────────────────────── Failed command ────────────────────────────────
+sd-make-inventory --include 'out/*.txt' -o inventory.jsonl  # exit=1
+───────────────────────── Expected outputs not created ─────────────────────────
+inventory.jsonl
+──────────────────────────────── Standard error ────────────────────────────────
+(stripped)
+────────────────────────────────────────────────────────────────────────────────
+DIRECTOR │ Ran 3 job(s).
+ WARNING │ 1 step(s) failed.
+ WARNING │ Scheduler is draining. Not reporting pending steps.
+ WARNING │ Skipping file cleanup due to incomplete build
+ WARNING │ Check logs: .stepup/fail.log .stepup/warning.log
+   PHASE │ watch
+DIRECTOR │ Wrote graph to current_graph.txt, current_graph_provenance.dot and current_graph_dependency.dot
+DIRECTOR │ See you!

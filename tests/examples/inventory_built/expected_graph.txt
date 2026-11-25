@@ -1,0 +1,77 @@
+root:
+             product   file:plan.py
+             product   step:./plan.py
+
+file:plan.py
+               state = CONFIRMED
+             creator   root:
+                sink   step:./plan.py
+
+step:./plan.py
+               state = SUCCEEDED
+                need = PLAN
+           using_env = STEPUP_PATH_FILTER [dynamic]
+             creator   root:
+              source   file:plan.py
+             product   st:data/
+             product   step:echo a > out/a.txt
+             product   step:sd-make-inventory out/a.txt --include out/run.log --include 'data/*.txt' --exclude '**/*.log' -o inventory.jsonl
+             product   step:sleep 1; echo log > out/run.log
+
+st:data/
+             creator   step:./plan.py
+             product   file:data/one.txt
+             product   file:data/two.txt
+
+step:echo a > out/a.txt
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+             product   file:out/a.txt
+                sink   file:out/a.txt
+
+file:out/a.txt
+               state = BUILT
+             creator   step:echo a > out/a.txt
+              source   step:echo a > out/a.txt
+                sink   step:sd-make-inventory out/a.txt --include out/run.log --include 'data/*.txt' --exclude '**/*.log' -o inventory.jsonl
+
+step:sleep 1; echo log > out/run.log
+               state = SUCCEEDED
+                need = DEFAULT
+             creator   step:./plan.py
+             product   file:out/run.log
+                sink   file:out/run.log
+
+file:out/run.log
+               state = BUILT
+             creator   step:sleep 1; echo log > out/run.log
+              source   step:sleep 1; echo log > out/run.log
+                sink   step:sd-make-inventory out/a.txt --include out/run.log --include 'data/*.txt' --exclude '**/*.log' -o inventory.jsonl
+
+step:sd-make-inventory out/a.txt --include out/run.log --include 'data/*.txt' --exclude '**/*.log' -o inventory.jsonl
+               state = SUCCEEDED
+                need = DEFAULT
+               nglob = data/*.txt
+             creator   step:./plan.py
+              source   file:data/one.txt [dynamic]
+              source   file:data/two.txt [dynamic]
+              source   file:out/a.txt
+              source   file:out/run.log
+             product   file:inventory.jsonl
+                sink   file:inventory.jsonl
+
+file:inventory.jsonl
+               state = BUILT
+             creator   step:sd-make-inventory out/a.txt --include out/run.log --include 'data/*.txt' --exclude '**/*.log' -o inventory.jsonl
+              source   step:sd-make-inventory out/a.txt --include out/run.log --include 'data/*.txt' --exclude '**/*.log' -o inventory.jsonl
+
+file:data/one.txt
+               state = CONFIRMED
+             creator   st:data/
+                sink   step:sd-make-inventory out/a.txt --include out/run.log --include 'data/*.txt' --exclude '**/*.log' -o inventory.jsonl
+
+file:data/two.txt
+               state = CONFIRMED
+             creator   st:data/
+                sink   step:sd-make-inventory out/a.txt --include out/run.log --include 'data/*.txt' --exclude '**/*.log' -o inventory.jsonl
