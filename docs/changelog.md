@@ -19,6 +19,10 @@ and this project adheres to [Effort-based Versioning](https://jacobtomlinson.dev
 
 ## [Unreleased][]
 
+(no changes yet)
+
+## [4.3.0a0][] - 2026-11-25 {: #v4.3.0a0 }
+
 This first development release takes over the inventory tools
 and the Zenodo synchronization of StepUp RepRep 4.2,
 under new names and with the changes listed below.
@@ -88,3 +92,4 @@ and its Zenodo configuration files and record-id files are used without changes.
       e.g. from the `StepInfo` returned by the step that builds them.
 
 [Unreleased]: https://github.com/reproducible-reporting/stepup-data
+[4.3.0a0]: https://github.com/reproducible-reporting/stepup-data/releases/tag/v4.3.0a0
